@@ -30,6 +30,7 @@ export function SessionSidebar({
   const { error: showError, success: showSuccess } = useToast();
   
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   const handleCreateSession = async () => {
@@ -53,6 +54,7 @@ export function SessionSidebar({
   };
 
   const handleDeleteSession = async (sessionId: string) => {
+    setIsDeleting(true);
     try {
       const result = await deleteSession(sessionId);
       if (result.success) {
@@ -74,6 +76,8 @@ export function SessionSidebar({
       }
     } catch (error) {
       showError('Failed to delete session');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -110,9 +114,13 @@ export function SessionSidebar({
             onClick={handleCreateSession}
             disabled={isCreating}
             className="p-2 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
-            title="New chat"
+            title={isCreating ? "Creating new chat..." : "New chat"}
           >
-            <Plus className="h-4 w-4" />
+            {isCreating ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-600 border-t-transparent"></div>
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>
@@ -140,8 +148,17 @@ export function SessionSidebar({
           disabled={isCreating}
           className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
         >
-          <Plus className="h-4 w-4" />
-          <span>New Chat</span>
+          {isCreating ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+              <span>Creating...</span>
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4" />
+              <span>New Chat</span>
+            </>
+          )}
         </button>
       </div>
 
@@ -211,12 +228,20 @@ export function SessionSidebar({
               >
                 Cancel
               </button>
-              <button
-                onClick={() => handleDeleteSession(showDeleteConfirm)}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Delete
-              </button>
+                             <button
+                 onClick={() => handleDeleteSession(showDeleteConfirm)}
+                 disabled={isDeleting}
+                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+               >
+                 {isDeleting ? (
+                   <>
+                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                     <span>Deleting...</span>
+                   </>
+                 ) : (
+                   <span>Delete</span>
+                 )}
+               </button>
             </div>
           </div>
         </div>

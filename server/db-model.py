@@ -28,6 +28,7 @@ class Session:
 
     sessionId: str
     userId: str
+    name: Optional[str] = None
     createdAt: Optional[datetime] = None
     updatedAt: Optional[datetime] = None
 

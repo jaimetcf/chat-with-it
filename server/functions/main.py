@@ -5,12 +5,50 @@ from firebase_admin import initialize_app
 
 from chat import run_chat
 from vectorize_file import run_vectorize_file
+from session_management import create_user_session, list_user_sessions, delete_user_session
 
 
 # Maximum number of containers that can be running at the same time.
 set_global_options(max_instances=2)
 
 app = initialize_app()
+
+
+# Session Management Functions
+@https_fn.on_call()
+def create_session(req: https_fn.CallableRequest) -> dict:
+    """Cloud function to create a new session."""
+    # Verify authentication
+    if not req.auth:
+        return {'success': False, 'message': 'Unauthorized', 'data': None}
+    
+    uid = req.auth.uid
+    return create_user_session(uid)
+
+@https_fn.on_call()
+def list_sessions(req: https_fn.CallableRequest) -> dict:
+    """Cloud function to list user sessions."""
+    # Verify authentication
+    if not req.auth:
+        return {'success': False, 'message': 'Unauthorized', 'data': None}
+    
+    uid = req.auth.uid
+    return list_user_sessions(uid)
+
+@https_fn.on_call()
+def delete_session(req: https_fn.CallableRequest) -> dict:
+    """Cloud function to delete a session."""
+    # Verify authentication
+    if not req.auth:
+        return {'success': False, 'message': 'Unauthorized', 'data': None}
+    
+    uid = req.auth.uid
+    session_id = req.data.get('sessionId')
+    
+    if not session_id:
+        return {'success': False, 'message': 'Session ID is required', 'data': None}
+    
+    return delete_user_session(uid, session_id)
 
 
 @https_fn.on_call()

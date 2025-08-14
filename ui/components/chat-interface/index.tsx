@@ -6,9 +6,10 @@ import { httpsCallable, getFunctions } from 'firebase/functions';
 
 import { useAuth } from '@/components/auth-provider';
 import { useToast } from '@/components/toast';
-import { TMessage } from './interfaces';
-import { subscribeToSessionMessages } from './services';
+import { TMessage, ISession } from './interfaces';
+import { subscribeToSessionMessages, listUserSessions } from './services';
 import AssistantMessage from './assistant-message';
+import { SessionSidebar } from './session-sidebar';
 
 
 export function ChatInterface() {
@@ -18,11 +19,12 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<TMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ISession[]>([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // For now, support a single session per user
-  const sessionId = '001';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,18 +34,54 @@ export function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
-  // Subscribe to Firestore messages for the current user and session
+  // Load sessions when user changes
   useEffect(() => {
     if (!user?.uid) return;
-    console.log(`user.uid =======> ${user.uid}`);
-    const unsubscribe = subscribeToSessionMessages(sessionId, (msgs) => setMessages(msgs));
-    return () => unsubscribe();
+    loadSessions();
   }, [user?.uid]);
+
+  // Subscribe to Firestore messages for the current session
+  useEffect(() => {
+    if (!user?.uid || !currentSessionId) return;
+    //console.log(`user.uid =======> ${user.uid}, sessionId =======> ${currentSessionId}`);
+    const unsubscribe = subscribeToSessionMessages(currentSessionId, (msgs) => setMessages(msgs));
+    return () => unsubscribe();
+  }, [user?.uid, currentSessionId]);
+
+  const loadSessions = async () => {
+    setIsLoadingSessions(true);
+    try {
+      const result = await listUserSessions();
+      if (result.success && result.data) {
+        setSessions(result.data);
+        // Select the most recent session if no session is currently selected
+        if (!currentSessionId && result.data.length > 0) {
+          setCurrentSessionId(result.data[0].sessionId);
+        }
+      } else {
+        showError(result.message || 'Failed to load sessions');
+      }
+    } catch (error) {
+      showError('Failed to load sessions');
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
+  const handleSessionSelect = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    setMessages([]); // Clear messages when switching sessions
+  };
+
+  const handleSessionsUpdate = () => {
+    // Refresh sessions list when sessions are created or deleted
+    loadSessions();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-    if (!user?.uid) return;
+    if (!user?.uid || !currentSessionId) return;
 
     const clientMessageId = Date.now().toString();
     const prompt = input.trim();
@@ -56,7 +94,7 @@ export function ChatInterface() {
       const chatFunction = httpsCallable(functions, 'chat');
       const result = await chatFunction({
         prompt,
-        sessionId,
+        sessionId: currentSessionId,
         clientMessageId,
       });
       const data = result.data as { success: boolean; message: string; data: string | null };
@@ -65,6 +103,8 @@ export function ChatInterface() {
         showError(data.message || 'Sorry, I encountered an error. Please try again.', 'Chat Error');
       } else {
         // Success path: Firestore subscription will render saved messages
+        // Reload sessions to get updated names
+        await loadSessions();
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -75,15 +115,28 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-lg shadow-sm border">
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center text-gray-500 mt-8">
-            <Bot className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p>Start a conversation with your AI assistant</p>
-          </div>
-        )}
+    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-lg shadow-sm border">
+      {/* Session Sidebar */}
+      <SessionSidebar
+        currentSessionId={currentSessionId}
+        sessions={sessions}
+        isLoading={isLoadingSessions}
+        onSessionSelect={handleSessionSelect}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onSessionsUpdate={handleSessionsUpdate}
+      />
+
+      {/* Chat Interface */}
+      <div className="flex flex-col flex-1">
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.length === 0 && (
+            <div className="text-center text-gray-500 mt-8">
+              <Bot className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p>Start a conversation with your AI assistant</p>
+            </div>
+          )}
         
         {messages.map((message) => (
           <div
@@ -161,6 +214,7 @@ export function ChatInterface() {
             <Send className="h-5 w-5" />
           </button>
         </form>
+      </div>
       </div>
     </div>
   );

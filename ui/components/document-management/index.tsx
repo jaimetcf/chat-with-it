@@ -1,19 +1,36 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { 
+  Upload, 
+  FileText, 
+  CheckCircle, 
+  Clock, 
+  AlertCircle, 
+  Trash2 
+} from 'lucide-react';
 import { ref, uploadBytes, deleteObject } from 'firebase/storage';
 
 import { useAuth } from '@/components/auth-provider';
+import { useToast } from '@/components/toast';
 import { storage } from '@/lib/firebase';
-import { subscribeToDocuments } from './services';
+import { 
+  subscribeToDocuments, 
+  subscribeToDocumentProcessingStatus, 
+  DocumentProcessingStatus 
+} from './services';
 import { Document } from './interfaces';
 
 export function DocumentManagement() {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [processingStatuses, setProcessingStatuses] = useState<DocumentProcessingStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { success: showSuccess, error: showError, info: showInfo } = useToast();
+
+  // Track previous statuses to detect changes
+  const [previousStatuses, setPreviousStatuses] = useState<Map<string, string>>(new Map());
 
   // Subscribe to documents for the current user
   useEffect(() => {
@@ -22,6 +39,47 @@ export function DocumentManagement() {
     const unsubscribe = subscribeToDocuments(user.uid, (docs) => setDocuments(docs));
     return () => unsubscribe();
   }, [user?.uid]);
+
+  // Subscribe to document processing status for real-time updates
+  useEffect(() => {
+    if (!user?.uid) return;
+    console.log(`Subscribing to processing status for user: ${user.uid}`);
+    const unsubscribe = subscribeToDocumentProcessingStatus(user.uid, (statuses) => {
+      setProcessingStatuses(statuses);
+      
+      // Check for status changes and show appropriate toasts
+      statuses.forEach((status) => {
+        const previousStatus = previousStatuses.get(status.file_name);
+        
+        if (previousStatus !== status.status) {
+          // Status changed, show notification
+          switch (status.status) {
+            case 'processing':
+              showInfo(`${status.file_name} is being processed...`);
+              break;
+            case 'vectorizing':
+              showInfo(`${status.file_name} is being vectorized for search...`);
+              break;
+            case 'completed':
+              showSuccess(`${status.file_name} is ready for chat!`);
+              break;
+            case 'failed':
+              showError(`${status.file_name} processing failed: ${status.error_message || 'Unknown error'}`);
+              break;
+          }
+        }
+      });
+      
+      // Update previous statuses
+      const newPreviousStatuses = new Map();
+      statuses.forEach((status) => {
+        newPreviousStatuses.set(status.file_name, status.status);
+      });
+      setPreviousStatuses(newPreviousStatuses);
+    });
+    
+    return () => unsubscribe();
+  }, [user?.uid, previousStatuses, showSuccess, showError, showInfo]);
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -32,13 +90,16 @@ export function DocumentManagement() {
       const file = files[i];
       
       try {
+        // Show initial upload notification
+        showInfo(`${file.name} uploaded successfully. Processing will begin shortly...`);
+        
         // Upload to Firebase Storage
         const storageRef = ref(storage, `user-documents/${user?.uid}/${file.name}`);
         await uploadBytes(storageRef, file);
-        // The subscription will automatically update the documents list
+        // The subscription will automatically update the documents list and show processing notifications
       } catch (error) {
         console.error('Upload error:', error);
-        alert(`Failed to upload ${file.name}. Please try again.`);
+        showError(`Failed to upload ${file.name}. Please try again.`);
       }
     }
 
@@ -55,14 +116,32 @@ export function DocumentManagement() {
       // Delete from Firebase Storage
       const storageRef = ref(storage, `user-documents/${user?.uid}/${document.name}`);
       await deleteObject(storageRef);
+      showSuccess(`${document.name} deleted successfully`);
       // The subscription will automatically update the documents list
     } catch (error) {
       console.error('Delete error:', error);
-      alert('Failed to delete document. Please try again.');
+      showError('Failed to delete document. Please try again.');
     }
   };
 
-  const getStatusIcon = (status: Document['status']) => {
+  const getStatusIcon = (status: Document['status'], processingStatus?: DocumentProcessingStatus) => {
+    // If we have real-time processing status, use that instead
+    if (processingStatus) {
+      switch (processingStatus.status) {
+        case 'uploading':
+          return <Clock className="h-4 w-4 text-yellow-500" />;
+        case 'processing':
+          return <Clock className="h-4 w-4 text-blue-500" />;
+        case 'vectorizing':
+          return <Clock className="h-4 w-4 text-purple-500" />;
+        case 'completed':
+          return <CheckCircle className="h-4 w-4 text-green-500" />;
+        case 'failed':
+          return <AlertCircle className="h-4 w-4 text-red-500" />;
+      }
+    }
+    
+    // Fallback to document status
     switch (status) {
       case 'uploading':
         return <Clock className="h-4 w-4 text-yellow-500" />;
@@ -75,7 +154,28 @@ export function DocumentManagement() {
     }
   };
 
-  const getStatusText = (status: Document['status']) => {
+  const getStatusText = (status: Document['status'], processingStatus?: DocumentProcessingStatus) => {
+    // If we have real-time processing status, use that instead
+    if (processingStatus) {
+      const progressText = processingStatus.progress_percentage 
+        ? ` (${processingStatus.progress_percentage}%)` 
+        : '';
+        
+      switch (processingStatus.status) {
+        case 'uploading':
+          return `Uploading...${progressText}`;
+        case 'processing':
+          return `Processing...${progressText}`;
+        case 'vectorizing':
+          return `Vectorizing...${progressText}`;
+        case 'completed':
+          return 'Ready for chat';
+        case 'failed':
+          return 'Processing failed';
+      }
+    }
+    
+    // Fallback to document status
     switch (status) {
       case 'uploading':
         return 'Uploading...';
@@ -153,39 +253,55 @@ export function DocumentManagement() {
               <p>No documents uploaded yet</p>
             </div>
           ) : (
-            documents.map((document) => (
-              <div key={document.id} className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {document.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatFileSize(document.size)} • Uploaded{' '}
-                        {document.uploadedAt.toLocaleDateString()}
-                      </p>
+            documents.map((document) => {
+              // Find corresponding processing status
+              const processingStatus = processingStatuses.find(
+                status => status.file_name === document.name
+              );
+              
+              return (
+                <div key={document.id} className="px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <FileText className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {document.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(document.size)} • Uploaded{' '}
+                          {document.uploadedAt.toLocaleDateString()}
+                        </p>
+                        {/* Show progress bar for processing documents */}
+                        {processingStatus && processingStatus.status !== 'completed' && processingStatus.status !== 'failed' && (
+                          <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                            <div 
+                              className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                              style={{ width: `${processingStatus.progress_percentage || 0}%` }}
+                            ></div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(document.status)}
-                      <span className="text-sm text-gray-600">
-                        {getStatusText(document.status)}
-                      </span>
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
+                        {getStatusIcon(document.status, processingStatus)}
+                        <span className="text-sm text-gray-600">
+                          {getStatusText(document.status, processingStatus)}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteDocument(document)}
+                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                        title="Delete document"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleDeleteDocument(document)}
-                      className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                      title="Delete document"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

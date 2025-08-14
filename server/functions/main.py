@@ -1,8 +1,10 @@
-from typing import List, Optional, Dict, Any
 from firebase_functions import https_fn, storage_fn
 from firebase_functions.options import set_global_options
 from firebase_admin import initialize_app
+from firebase_admin import firestore
+from datetime import datetime
 
+from path_handling import get_user_id, get_file_name
 from chat import run_chat
 from vectorize_file import run_vectorize_file
 from session_management import create_user_session, list_user_sessions, delete_user_session
@@ -91,6 +93,27 @@ def vectorize_file(event: storage_fn.CloudEvent[storage_fn.StorageObjectData]) -
     # Extract file information from the event
     file_path = event.data.name
     bucket_name = event.data.bucket
+    
+    # Extract user ID and file name
+    user_id = get_user_id(file_path)
+    file_name = get_file_name(file_path)
+    
+    # Set initial uploading status
+    try:
+        db_client = firestore.client()
+        status_ref = db_client.collection('document_processing_status').document(user_id).collection('files').document(file_name)
+        
+        status_ref.set({
+            'user_id': user_id,
+            'file_name': file_name,
+            'status': 'uploading',
+            'progress_percentage': 0,
+            'started_at': datetime.now(),
+            'updated_at': datetime.now()
+        }, merge=True)
+        print(f"Set initial uploading status for {file_name}")
+    except Exception as e:
+        print(f"Error setting initial status: {str(e)}")
     
     # Run the vectorization pipeline
     return run_vectorize_file(file_path, bucket_name)

@@ -119,3 +119,24 @@ class UserVectorStores:
     """
     user_id: str
     vector_store_ids: List[str]
+
+
+@dataclass
+class DocumentProcessingStatus:
+    """Represents the real-time processing status of a document for user notifications.
+
+    Each document in the document_processing_status collection tracks the current
+    processing state of a file, enabling real-time updates to the frontend about
+    document processing progress.
+
+    Storage path: document_processing_status/{userId}/{fileName}
+    """
+
+    user_id: str
+    file_name: str
+    status: Literal["uploading", "processing", "vectorizing", "completed", "failed"]
+    error_message: Optional[str] = None
+    progress_percentage: Optional[int] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

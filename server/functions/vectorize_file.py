@@ -8,6 +8,7 @@ from firebase_admin import storage
 from firebase_admin import firestore
 from openai import OpenAI
 import io
+from datetime import datetime
 
 from path_handling import get_user_id, get_file_name
 from file_handling import get_file_extension, detect_file_type
@@ -47,6 +48,10 @@ def run_vectorize_file(file_path: str, bucket_name: str) -> str:
     print(f"Detected file type: {file_type}")
     
     try:
+        # Initialize Firestore client and update status to processing
+        db_client = firestore.client()
+        update_processing_status(db_client, user_id, file_name, 'processing', progress_percentage=10)
+        
         # Check if file type is supported by OpenAI FileSearch
         supported_extensions = {
             '.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.txt', '.rtf', 
@@ -55,26 +60,52 @@ def run_vectorize_file(file_path: str, bucket_name: str) -> str:
         }
         
         if file_extension.lower() not in supported_extensions:
-            return f"{file_name} ({file_type}) - File type not supported by OpenAI FileSearch. Supported types: {', '.join(supported_extensions)}"
+            error_msg = f"File type not supported by OpenAI FileSearch. Supported types: {', '.join(supported_extensions)}"
+            update_processing_status(db_client, user_id, file_name, 'failed', error_msg)
+            return f"{file_name} ({file_type}) - {error_msg}"
         
         openai_client = OpenAI(api_key= os.getenv('OPENAI_API_KEY'))
-        db_client = firestore.client()
         user_vector_stores_ref = db_client.collection('user_vector_stores').document(user_id)
         user_vector_stores_doc = user_vector_stores_ref.get()
-            
+        
+        # Download file to memory
+        update_processing_status(db_client, user_id, file_name, 'processing', progress_percentage=20)
         in_memory_file = download_file_to_memory(file_path, bucket_name, file_extension)
+        
+        # Upload to OpenAI
+        update_processing_status(db_client, user_id, file_name, 'processing', progress_percentage=40)
         file_id = upload_file_to_openai(in_memory_file, openai_client, file_name)
+        
+        # Get or create vector store
+        update_processing_status(db_client, user_id, file_name, 'processing', progress_percentage=60)
         vector_store_id = get_vector_store(user_id, user_vector_stores_doc, openai_client)
+        
+        # Add file to vector store
+        update_processing_status(db_client, user_id, file_name, 'vectorizing', progress_percentage=80)
         add_file_to_vector_store(openai_client, vector_store_id, file_id)
+        
+        # Wait for processing to complete
         await_vector_store_processing(openai_client, vector_store_id, file_id)
+        
+        # Update Firestore with vector store info
+        update_processing_status(db_client, user_id, file_name, 'processing', progress_percentage=90)
         update_firestore_vector_store(
             user_vector_stores_ref, user_vector_stores_doc, user_id, vector_store_id)
+        
+        # Mark as completed
+        update_processing_status(db_client, user_id, file_name, 'completed', progress_percentage=100)
             
         return f"{file_name} ({file_type}) - OpenAI Vector Store pipeline successful! File vectorized and stored in OpenAI Vector Store."
             
     except Exception as e:
+        error_msg = f"OpenAI Vector Store processing failed: {str(e)}"
         print(f"Error during OpenAI Vector Store processing: {str(e)}")
-        return f"{file_name} ({file_type}) - OpenAI Vector Store processing failed: {str(e)}"
+        
+        # Update status to failed if we have the db_client
+        if 'db_client' in locals():
+            update_processing_status(db_client, user_id, file_name, 'failed', error_msg)
+        
+        return f"{file_name} ({file_type}) - {error_msg}"
 
     finally:
         # Clean up temporary file with retry mechanism
@@ -298,3 +329,49 @@ def update_firestore_vector_store(
             })
 
     print(f"Updated Firestore with vector store ID: {vector_store_id}")
+
+def update_processing_status(
+    db_client, 
+    user_id: str, 
+    file_name: str, 
+    status: str, 
+    error_message: str = None,
+    progress_percentage: int = None
+) -> None:
+    """
+    Update the processing status of a document in Firestore for real-time notifications.
+    
+    Args:
+        db_client: Firestore client instance
+        user_id: ID of the user
+        file_name: Name of the file being processed
+        status: Current processing status
+        error_message: Error message if status is 'failed'
+        progress_percentage: Progress percentage (0-100)
+    """
+    try:
+        status_ref = db_client.collection('document_processing_status').document(user_id).collection('files').document(file_name)
+        
+        update_data = {
+            'user_id': user_id,
+            'file_name': file_name,
+            'status': status,
+            'updated_at': datetime.now()
+        }
+        
+        if error_message:
+            update_data['error_message'] = error_message
+            
+        if progress_percentage is not None:
+            update_data['progress_percentage'] = progress_percentage
+            
+        if status == 'uploading':
+            update_data['started_at'] = datetime.now()
+        elif status in ['completed', 'failed']:
+            update_data['completed_at'] = datetime.now()
+            
+        status_ref.set(update_data, merge=True)
+        print(f"Updated processing status for {file_name}: {status}")
+        
+    except Exception as e:
+        print(f"Error updating processing status: {str(e)}")

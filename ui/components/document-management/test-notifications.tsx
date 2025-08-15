@@ -1,6 +1,6 @@
 'use client';
 
-import { useToast } from '@/components/toast';
+import { useToast } from '../toast';
 
 export function TestNotifications() {
   const { success, error, info, warning } = useToast();

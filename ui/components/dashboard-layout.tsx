@@ -1,7 +1,7 @@
 'use client';
 
-import { useAuth } from '@/components/auth-provider';
-import { signOutUser } from '@/lib/auth';
+import { useAuth } from './auth-provider';
+import { signOutUser } from '../lib/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MessageSquare, Upload, LogOut, User } from 'lucide-react';

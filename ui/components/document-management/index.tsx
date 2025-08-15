@@ -12,8 +12,8 @@ import {
 import { ref, uploadBytes, deleteObject } from 'firebase/storage';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 
-import { useAuth } from '@/components/auth-provider';
-import { storage } from '@/lib/firebase';
+import { useAuth } from '../auth-provider';
+import { storage } from '../../lib/firebase';
 import { 
   subscribeToDocuments, 
   subscribeToDocumentProcessingStatus, 

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useAuth } from '@/components/auth-provider';
-import { useToast } from '@/components/toast';
+import { useAuth } from '../auth-provider';
+import { useToast } from '../toast';
 import { ISession } from './interfaces';
 import { createNewSession, deleteSession } from './services';
 

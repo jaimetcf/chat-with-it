@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signInWithGoogle } from '@/lib/auth';
+import { signInWithGoogle } from '../../../lib/auth';
 
 export default function SignupPage() {
   const [error, setError] = useState('');

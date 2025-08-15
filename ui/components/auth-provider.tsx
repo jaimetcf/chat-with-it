@@ -30,6 +30,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Only run on client side and if auth is available
+    if (typeof window === 'undefined' || !auth) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const unsubscribe = onAuthStateChanged(auth, 
         (user) => {

@@ -114,28 +114,28 @@ export default function AssistantMessage(
                                 className="prose prose-sm max-w-none"
                                 components={{
                                     // Custom styling for different markdown elements
-                                    p: ({ children }: { children: ReactNode }) => (
+                                    p: ({ children }: { children?: ReactNode }) => (
                                         <p className="mb-2 last:mb-0">{children}</p>
                                     ),
-                                    h1: ({ children }: { children: ReactNode }) => (
+                                    h1: ({ children }: { children?: ReactNode }) => (
                                         <h1 className="text-lg font-bold mb-2 text-gray-900">{children}</h1>
                                     ),
-                                    h2: ({ children }: { children: ReactNode }) => (
+                                    h2: ({ children }: { children?: ReactNode }) => (
                                         <h2 className="text-base font-semibold mb-2 text-gray-900">{children}</h2>
                                     ),
-                                    h3: ({ children }: { children: ReactNode }) => (
+                                    h3: ({ children }: { children?: ReactNode }) => (
                                         <h3 className="text-sm font-semibold mb-1 text-gray-900">{children}</h3>
                                     ),
-                                    ul: ({ children }: { children: ReactNode }) => (
+                                    ul: ({ children }: { children?: ReactNode }) => (
                                         <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>
                                     ),
-                                    ol: ({ children }: { children: ReactNode }) => (
+                                    ol: ({ children }: { children?: ReactNode }) => (
                                         <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>
                                     ),
-                                    li: ({ children }: { children: ReactNode }) => (
+                                    li: ({ children }: { children?: ReactNode }) => (
                                         <li className="text-gray-700">{children}</li>
                                     ),
-                                    code: ({ children, className }: { children: ReactNode; className?: string }) => {
+                                    code: ({ children, className }: { children?: ReactNode; className?: string }) => {
                                         const isInline = !className;
                                         return isInline ? (
                                             <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">
@@ -147,23 +147,23 @@ export default function AssistantMessage(
                                             </code>
                                         );
                                     },
-                                    pre: ({ children }: { children: ReactNode }) => (
+                                    pre: ({ children }: { children?: ReactNode }) => (
                                         <pre className="bg-gray-100 p-3 rounded-lg overflow-x-auto mb-2">
                                             {children}
                                         </pre>
                                     ),
-                                    blockquote: ({ children }: { children: ReactNode }) => (
+                                    blockquote: ({ children }: { children?: ReactNode }) => (
                                         <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-2">
                                             {children}
                                         </blockquote>
                                     ),
-                                    strong: ({ children }: { children: ReactNode }) => (
+                                    strong: ({ children }: { children?: ReactNode }) => (
                                         <strong className="font-semibold text-gray-900">{children}</strong>
                                     ),
-                                    em: ({ children }: { children: ReactNode }) => (
+                                    em: ({ children }: { children?: ReactNode }) => (
                                         <em className="italic text-gray-700">{children}</em>
                                     ),
-                                    a: ({ children, href }: { children: ReactNode; href?: string }) => (
+                                    a: ({ children, href }: { children?: ReactNode; href?: string }) => (
                                         <a 
                                             href={href} 
                                             target="_blank" 

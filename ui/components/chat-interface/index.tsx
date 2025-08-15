@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 
-import { useAuth } from '../auth-provider';
-import { useToast } from '../toast';
+import { useAuth } from '@/components/auth-provider';
+import { useToast } from '@/components/toast';
 import { TMessage, ISession } from './interfaces';
 import { subscribeToSessionMessages, listUserSessions } from './services';
 import AssistantMessage from './assistant-message';

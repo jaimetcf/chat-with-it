@@ -191,13 +191,15 @@ ui/
 
 This project is configured for easy deployment on Vercel:
 
+**Important**: The Next.js application is located in the `ui` subdirectory. When deploying to Vercel, you must set the "Root Directory" to `ui` in the project settings.
+
 1. **Push your code to a Git repository** (GitHub, GitLab, or Bitbucket)
 
 2. **Connect to Vercel:**
    - Go to [vercel.com](https://vercel.com) and sign in
    - Click "New Project"
    - Import your Git repository
-   - Set the root directory to `ui`
+   - **Important**: In the project settings, set the "Root Directory" to `ui`
    - Vercel will auto-detect Next.js settings
 
 3. **Configure Environment Variables:**
@@ -232,6 +234,23 @@ This UI is designed to integrate with:
 5. **OpenAI Agents SDK** for AI processing
 
 The backend functions need to be deployed separately to Google Cloud Functions.
+
+## Troubleshooting
+
+### Build Errors on Vercel
+
+If you encounter module resolution errors during Vercel deployment:
+
+1. **Check Root Directory**: Ensure the "Root Directory" is set to `ui` in your Vercel project settings
+2. **Import Paths**: All imports should use absolute paths with `@/` prefix (e.g., `@/lib/firebase`)
+3. **Environment Variables**: Verify all Firebase environment variables are set in Vercel dashboard
+4. **Build Logs**: Check the build logs for specific module resolution errors
+
+### Common Issues
+
+- **"Module not found" errors**: Usually indicate incorrect root directory setting in Vercel
+- **Firebase configuration errors**: Check that all environment variables are properly set
+- **Build failures**: Ensure all dependencies are properly installed and TypeScript compilation passes
 
 ## Contributing
 

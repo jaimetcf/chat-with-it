@@ -1,4 +1,4 @@
-import { storage } from '../../lib/firebase';
+import { storage } from '@/lib/firebase';
 import { ref, listAll, getMetadata } from 'firebase/storage';
 import { getFirestore, collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
 

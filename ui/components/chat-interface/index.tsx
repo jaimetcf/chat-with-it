@@ -32,7 +32,7 @@ export function ChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isLoading]);
 
   // Load sessions when user changes
   useEffect(() => {

@@ -47,11 +47,11 @@ def run_vectorize_file(file_path: str, bucket_name: str) -> str:
     print(f"File extension: {file_extension}")
     print(f"Detected file type: {file_type}")
     
+    # Initialize Firestore client and create initial uploading status
+    db_client = firestore.client()
+    update_processing_status(db_client, user_id, file_name, 'uploading', progress_percentage=0)
+    
     try:
-        # Initialize Firestore client and update status to processing
-        db_client = firestore.client()
-        update_processing_status(db_client, user_id, file_name, 'processing', progress_percentage=10)
-        
         # Check if file type is supported by OpenAI FileSearch
         supported_extensions = {
             '.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.txt', '.rtf', 
@@ -65,6 +65,7 @@ def run_vectorize_file(file_path: str, bucket_name: str) -> str:
             return f"{file_name} ({file_type}) - {error_msg}"
         
         openai_client = OpenAI(api_key= os.getenv('OPENAI_API_KEY'))
+
         user_vector_stores_ref = db_client.collection('user_vector_stores').document(user_id)
         user_vector_stores_doc = user_vector_stores_ref.get()
         
@@ -77,23 +78,31 @@ def run_vectorize_file(file_path: str, bucket_name: str) -> str:
         file_id = upload_file_to_openai(in_memory_file, openai_client, file_name)
         
         # Get or create vector store
-        update_processing_status(db_client, user_id, file_name, 'processing', progress_percentage=60)
+        update_processing_status(db_client, user_id, file_name, 'vectorizing', progress_percentage=60)
         vector_store_id = get_vector_store(user_id, user_vector_stores_doc, openai_client)
         
         # Add file to vector store
-        update_processing_status(db_client, user_id, file_name, 'vectorizing', progress_percentage=80)
+        update_processing_status(
+            db_client, user_id, file_name, 'vectorizing', progress_percentage=80, file_id=file_id)
         add_file_to_vector_store(openai_client, vector_store_id, file_id)
         
         # Wait for processing to complete
         await_vector_store_processing(openai_client, vector_store_id, file_id)
         
         # Update Firestore with vector store info
-        update_processing_status(db_client, user_id, file_name, 'processing', progress_percentage=90)
+        update_processing_status(
+            db_client, user_id, file_name, 'vectorizing', 
+            progress_percentage=90, file_id=file_id, vector_store_id=vector_store_id)
         update_firestore_vector_store(
-            user_vector_stores_ref, user_vector_stores_doc, user_id, vector_store_id)
+            user_vector_stores_ref, 
+            user_vector_stores_doc, 
+            user_id, vector_store_id
+        )
         
         # Mark as completed
-        update_processing_status(db_client, user_id, file_name, 'completed', progress_percentage=100)
+        update_processing_status(
+            db_client, user_id, file_name, 'completed', 
+            progress_percentage=100, file_id=file_id, vector_store_id=vector_store_id)
             
         return f"{file_name} ({file_type}) - OpenAI Vector Store pipeline successful! File vectorized and stored in OpenAI Vector Store."
             
@@ -122,7 +131,6 @@ def run_vectorize_file(file_path: str, bucket_name: str) -> str:
                     if attempt == max_retries - 1:
                         print(f"Failed to close in-memory file after {max_retries} attempts")
                     time.sleep(1)  # Wait before retrying
-
 
 
 def download_file_to_memory(
@@ -336,7 +344,9 @@ def update_processing_status(
     file_name: str, 
     status: str, 
     error_message: str = None,
-    progress_percentage: int = None
+    progress_percentage: int = None,
+    file_id: str = None,
+    vector_store_id: str = None
 ) -> None:
     """
     Update the processing status of a document in Firestore for real-time notifications.
@@ -350,7 +360,9 @@ def update_processing_status(
         progress_percentage: Progress percentage (0-100)
     """
     try:
-        status_ref = db_client.collection('document_processing_status').document(user_id).collection('files').document(file_name)
+        # Create a unique document ID that combines user_id and file_name
+        document_id = f"{user_id}_{file_name}"
+        status_ref = db_client.collection('document_processing_status').document(document_id)
         
         update_data = {
             'user_id': user_id,
@@ -364,6 +376,12 @@ def update_processing_status(
             
         if progress_percentage is not None:
             update_data['progress_percentage'] = progress_percentage
+            
+        if file_id:
+            update_data['file_id'] = file_id
+            
+        if vector_store_id:
+            update_data['vector_store_id'] = vector_store_id
             
         if status == 'uploading':
             update_data['started_at'] = datetime.now()

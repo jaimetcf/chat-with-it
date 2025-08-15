@@ -5,19 +5,23 @@ This is the Next.js frontend application for the Chat with It system. It provide
 ## Features
 
 - **Authentication**: Firebase Authentication with email/password login and signup
-- **Chat Interface**: Real-time chat interface similar to ChatGPT
-- **Document Management**: Upload and manage company documents with processing status
+- **Chat Interface**: Real-time chat interface with session management and message history
+- **Document Management**: Upload, process, and manage company documents with real-time status updates
 - **Protected Routes**: Secure access to authenticated features
 - **Responsive Design**: Modern UI built with Tailwind CSS
+- **Toast Notifications**: User feedback system for actions and errors
+- **Session Management**: Chat session persistence and management
 
 ## Tech Stack
 
 - **Frontend**: Next.js 14 with TypeScript
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS with class-variance-authority and clsx
 - **Authentication**: Firebase Auth
-- **Database**: Firestore (for future integration)
-- **Storage**: Firebase Storage (for future integration)
+- **Database**: Firestore (for chat sessions and user data)
+- **Storage**: Firebase Storage (for document uploads)
 - **Icons**: Lucide React
+- **Markdown**: React Markdown for message rendering
+- **State Management**: React Context for authentication
 
 ## Project Structure
 
@@ -40,13 +44,25 @@ ui/
 │   ├── auth-provider.tsx  # Authentication context
 │   ├── protected-route.tsx # Route protection
 │   ├── dashboard-layout.tsx # Dashboard layout
-│   ├── chat-interface.tsx # Chat component
-│   └── document-management.tsx # Document management
+│   ├── toast.tsx          # Toast notification system
+│   ├── chat-interface/    # Chat components
+│   │   ├── index.tsx      # Main chat interface
+│   │   ├── assistant-message.tsx # AI message component
+│   │   ├── session-sidebar.tsx # Chat session management
+│   │   ├── interfaces.ts  # TypeScript interfaces
+│   │   └── services.ts    # Chat-related services
+│   └── document-management/ # Document management components
+│       ├── index.tsx      # Main document interface
+│       ├── test-notifications.tsx # Notification testing
+│       ├── interfaces.ts  # TypeScript interfaces
+│       └── services.ts    # Document-related services
 ├── lib/                   # Utility libraries
 │   ├── firebase.ts        # Firebase configuration
 │   ├── auth.ts           # Authentication utilities
 │   └── utils.ts          # General utilities
-└── public/               # Static assets
+├── public/               # Static assets
+├── vercel.json           # Vercel deployment configuration
+└── .gitignore           # Git ignore rules
 ```
 
 ## Setup Instructions
@@ -55,7 +71,7 @@ ui/
 
 - Node.js 18+ 
 - npm or yarn
-- Firebase project (for authentication)
+- Firebase project (for authentication, storage, and database)
 
 ### Installation
 
@@ -70,11 +86,7 @@ ui/
    ```
 
 3. **Set up environment variables:**
-   ```bash
-   cp env.example .env.local
-   ```
-   
-   Edit `.env.local` and add your Firebase configuration:
+   Create a `.env.local` file in the `ui` directory:
    ```env
    NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
@@ -102,13 +114,22 @@ ui/
    - Go to Authentication > Sign-in method
    - Enable Email/Password authentication
 
-3. **Get your Firebase config:**
+3. **Set up Firestore Database:**
+   - Go to Firestore Database > Create database
+   - Choose production mode or test mode
+   - Set up security rules for user data
+
+4. **Configure Storage:**
+   - Go to Storage > Get started
+   - Set up security rules for file uploads
+
+5. **Get your Firebase config:**
    - Go to Project Settings > General
    - Scroll down to "Your apps" section
    - Add a web app if you haven't already
    - Copy the configuration object
 
-4. **Update your `.env.local`** with the Firebase config values
+6. **Update your `.env.local`** with the Firebase config values
 
 ## Usage
 
@@ -116,17 +137,22 @@ ui/
 - Users can sign up with email and password
 - Users can sign in with their credentials
 - Protected routes automatically redirect to login
+- Authentication state is persisted across sessions
 
 ### Chat Interface
 - Real-time chat with AI assistant
-- Message history display
+- Session management with multiple chat sessions
+- Message history with markdown rendering
 - Loading states and error handling
 - Responsive design for mobile and desktop
+- Assistant message formatting with code highlighting
 
 ### Document Management
 - Upload multiple document types (PDF, DOC, DOCX, TXT)
-- View document processing status
-- Track upload progress and completion
+- Real-time upload progress tracking
+- Document processing status updates
+- File deletion with confirmation
+- Toast notifications for user feedback
 
 ## API Endpoints
 
@@ -134,11 +160,13 @@ ui/
 - **Method**: POST
 - **Body**: `{ message: string, userId: string }`
 - **Response**: `{ response: string }`
+- **Note**: Currently returns mock responses, will be integrated with Google Cloud Functions
 
 ### `/api/upload`
 - **Method**: POST
 - **Body**: FormData with file and userId
 - **Response**: `{ success: boolean, message: string }`
+- **Note**: Currently logs uploads, will be integrated with Firebase Storage
 
 ## Development
 
@@ -151,28 +179,68 @@ ui/
 
 ### Code Structure
 
-- **Components**: Reusable React components in `/components`
-- **Pages**: Next.js pages in `/app`
+- **Components**: Modular React components organized by feature
+- **Pages**: Next.js app router pages in `/app`
 - **API Routes**: Server-side API endpoints in `/app/api`
 - **Utilities**: Helper functions in `/lib`
+- **Interfaces**: TypeScript type definitions for each feature
 
-## Future Integrations
+## Deployment
+
+### Vercel Deployment
+
+This project is configured for easy deployment on Vercel:
+
+1. **Push your code to a Git repository** (GitHub, GitLab, or Bitbucket)
+
+2. **Connect to Vercel:**
+   - Go to [vercel.com](https://vercel.com) and sign in
+   - Click "New Project"
+   - Import your Git repository
+   - Set the root directory to `ui`
+   - Vercel will auto-detect Next.js settings
+
+3. **Configure Environment Variables:**
+   - Add all Firebase environment variables in Vercel dashboard
+   - Go to Project Settings → Environment Variables
+
+4. **Deploy:**
+   - Vercel will automatically build and deploy your app
+   - You'll get a URL like `https://your-project-name.vercel.app`
+
+### Environment Variables for Production
+
+Make sure to set these in your Vercel project settings:
+
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+```
+
+## Backend Integration
 
 This UI is designed to integrate with:
 
-1. **Google Cloud Functions** for backend processing
-2. **Firebase Firestore** for data storage
+1. **Google Cloud Functions** for backend processing (in `server/functions/`)
+2. **Firebase Firestore** for chat sessions and user data
 3. **Firebase Storage** for document storage
 4. **Vector embeddings** for semantic search
 5. **OpenAI Agents SDK** for AI processing
 
+The backend functions need to be deployed separately to Google Cloud Functions.
+
 ## Contributing
 
-1. Follow the existing code structure
+1. Follow the existing code structure and naming conventions
 2. Use TypeScript for all new code
-3. Follow the established naming conventions
-4. Add proper error handling
+3. Add proper error handling and loading states
+4. Include toast notifications for user feedback
 5. Test your changes thoroughly
+6. Update interfaces when adding new features
 
 ## License
 

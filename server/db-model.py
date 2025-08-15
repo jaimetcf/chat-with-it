@@ -119,3 +119,27 @@ class UserVectorStores:
     """
     user_id: str
     vector_store_ids: List[str]
+
+
+@dataclass
+class DocumentProcessingStatus:
+    """Represents the real-time processing status of a document for user notifications.
+
+    Each document in the document_processing_status collection tracks the current
+    processing state of a file, enabling real-time updates to the frontend about
+    document processing progress.
+
+    Storage path: document_processing_status/{userId}_{fileName}
+    Document ID format: {userId}_{fileName} (e.g., "user123_document.pdf")
+    """
+
+    user_id: str
+    file_name: str
+    status: Literal["uploading", "processing", "vectorizing", "completed", "failed", "deleting"]
+    error_message: Optional[str] = None
+    progress_percentage: Optional[int] = None
+    file_id: Optional[str] = None  # OpenAI file ID for deletion purposes
+    vector_store_id: Optional[str] = None  # OpenAI vector store ID for deletion purposes
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
